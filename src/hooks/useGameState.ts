@@ -174,13 +174,13 @@ export const useGameState = (playerId: string): UseGameStateReturn => {
             const { targetX, targetY, isBoosting: wantsToBoosting } = inputRef.current;
             targetAngle = angleBetween(head, { x: targetX, y: targetY });
             
-            // Get or initialize boost energy
+          // Get or initialize boost energy
             let boostEnergy = boostEnergyRef.current.get(snake.id) ?? 50;
             
-            // Can boost if has energy
-            if (wantsToBoosting && boostEnergy > 0) {
+            // Can boost if has energy AND has enough score (minimum 5 to boost)
+            if (wantsToBoosting && boostEnergy > 0 && snake.score > GAME_CONFIG.INITIAL_LENGTH) {
               isBoosting = true;
-              boostEnergy = Math.max(0, boostEnergy - 0.5); // Drain boost
+              boostEnergy = Math.max(0, boostEnergy - 0.5); // Drain boost energy
             } else {
               // Recharge boost when not boosting (slower rate)
               boostEnergy = Math.min(100, boostEnergy + 0.1);
@@ -235,9 +235,10 @@ export const useGameState = (playerId: string): UseGameStateReturn => {
           }
           const newDirection = snake.direction + angleDiff;
 
-          // Speed and boosting - boost drains energy but NOT snake length
+          // Speed and boosting - boost drains score (points)
           const speed = isBoosting ? GAME_CONFIG.BOOST_SPEED : GAME_CONFIG.BASE_SPEED;
-          const newScore = snake.score;
+          // Drain 0.1 points per tick while boosting (snake gets shorter slowly)
+          const newScore = isBoosting ? Math.max(GAME_CONFIG.INITIAL_LENGTH, snake.score - 0.1) : snake.score;
 
           // Move head
           const newHead = {

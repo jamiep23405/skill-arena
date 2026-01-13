@@ -1,5 +1,7 @@
 import { formatTime } from '@/lib/gameUtils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface GameHUDProps {
   score: number;
@@ -24,10 +26,7 @@ const GameHUD = ({
   boostEnergy = 50,
 }: GameHUDProps) => {
   const isMobile = useIsMobile();
-
-  // Calculate boost percentage from the boost energy (0-100)
-  const boostPercentage = Math.min(100, boostEnergy);
-  const canBoost = boostEnergy > 0;
+  const [showMobileLeaderboard, setShowMobileLeaderboard] = useState(false);
 
   const leaderboard = [...players]
     .filter(p => p.isAlive)
@@ -58,13 +57,59 @@ const GameHUD = ({
       </div>
 
       {/* Top right - Alive + Leaderboard */}
-      <div className="absolute top-2 right-2 flex gap-2">
+      <div className="absolute top-2 right-2 flex flex-col gap-2">
+        {/* Alive counter with rank */}
         <div className={`bg-card/80 backdrop-blur-sm rounded-lg neon-border ${isMobile ? 'p-2' : 'p-4'}`}>
           <div className={`text-muted-foreground font-body ${isMobile ? 'text-xs' : 'text-sm'}`}>ALIVE</div>
           <div className={`font-display font-bold text-accent ${isMobile ? 'text-lg' : 'text-2xl'}`}>{playerCount}</div>
           <div className={`text-muted-foreground font-body ${isMobile ? 'text-[10px] mt-0.5' : 'text-xs mt-1'}`}>Rank: #{myRank}</div>
         </div>
 
+        {/* Mobile: Collapsible leaderboard toggle */}
+        {isMobile && (
+          <button
+            onClick={() => setShowMobileLeaderboard(!showMobileLeaderboard)}
+            className="pointer-events-auto bg-card/80 backdrop-blur-sm rounded-lg p-2 neon-border flex items-center justify-between gap-2"
+          >
+            <span className="text-xs text-muted-foreground font-body">TOP 5</span>
+            {showMobileLeaderboard ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
+        )}
+
+        {/* Mobile: Collapsible leaderboard */}
+        {isMobile && showMobileLeaderboard && (
+          <div className="bg-card/90 backdrop-blur-sm rounded-lg p-2 neon-border min-w-[140px] pointer-events-auto">
+            <div className="space-y-1">
+              {top.map((p, idx) => {
+                const isMe = p.id === playerId;
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between text-xs font-body ${
+                      isMe ? 'text-primary' : 'text-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] text-muted-foreground">#{idx + 1}</span>
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      <span className="truncate max-w-[60px]">{p.name}</span>
+                    </div>
+                    <span className="tabular-nums text-[10px]">{Math.floor(p.score)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop: Always visible leaderboard */}
         {!isMobile && (
           <div className="bg-card/80 backdrop-blur-sm rounded-lg p-4 neon-border min-w-[220px]">
             <div className="text-sm text-muted-foreground font-body">LEADERBOARD</div>
@@ -95,47 +140,6 @@ const GameHUD = ({
         )}
       </div>
 
-      {/* Bottom left - Boost Bar (hidden on mobile - they use the boost button) */}
-      {!isMobile && (
-        <div className="absolute bottom-20 left-4 bg-card/80 backdrop-blur-sm rounded-lg p-3 neon-border min-w-[180px]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground font-body">BOOST</span>
-            <span className={`text-xs font-display ${isBoosting ? 'text-secondary animate-pulse' : 'text-muted-foreground'}`}>
-              {isBoosting ? 'ACTIVE' : canBoost ? 'READY' : 'EMPTY'}
-            </span>
-          </div>
-          <div className="relative h-4 bg-muted/50 rounded-full overflow-hidden">
-            {/* Background glow when boosting */}
-            {isBoosting && (
-              <div className="absolute inset-0 bg-secondary/30 animate-pulse" />
-            )}
-            {/* Boost bar fill */}
-            <div 
-              className={`h-full rounded-full transition-all duration-100 ${
-                isBoosting 
-                  ? 'bg-gradient-to-r from-secondary to-accent' 
-                  : canBoost 
-                    ? 'bg-gradient-to-r from-primary to-secondary'
-                    : 'bg-muted-foreground/30'
-              }`}
-              style={{ 
-                width: `${boostPercentage}%`,
-                boxShadow: isBoosting ? '0 0 15px hsl(var(--secondary))' : 'none'
-              }}
-            />
-            {/* Energy markers */}
-            <div className="absolute inset-0 flex">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex-1 border-r border-background/30 last:border-r-0" />
-              ))}
-            </div>
-          </div>
-          <div className="text-xs text-muted-foreground font-body mt-1 text-center">
-            {Math.floor(boostEnergy)}% energy
-          </div>
-        </div>
-      )}
-
       {/* Bottom left - Connection status */}
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
         <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent' : 'bg-destructive'} animate-pulse`} />
@@ -147,7 +151,7 @@ const GameHUD = ({
       {/* Bottom center - Controls hint (desktop only) */}
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-muted-foreground font-body">
-          <span className="opacity-50">Move: WASD • Boost: Space</span>
+          <span className="opacity-50">Move: Mouse • Boost: Hold Click</span>
         </div>
       )}
     </div>
